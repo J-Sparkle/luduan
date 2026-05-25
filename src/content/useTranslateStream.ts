@@ -9,12 +9,20 @@ export interface TranslationState {
   error?: string;
 }
 
+export interface ModelSelection {
+  providerId: string;
+  modelName: string;
+}
+
 /**
  * Opens a port to the background and streams translation chunks.
- * `task` may change over time (e.g. user switches target language) — each new
- * task starts a fresh port and aborts the previous one.
+ * Re-streams whenever `task` or `selection` changes, so the user can switch
+ * model on the fly and immediately see the new translation arrive.
  */
-export function useTranslateStream(task: TranslateTask | null): TranslationState {
+export function useTranslateStream(
+  task: TranslateTask | null,
+  selection?: ModelSelection | null,
+): TranslationState {
   const [state, setState] = useState<TranslationState>({ status: 'idle', text: '' });
   const portRef = useRef<chrome.runtime.Port | null>(null);
 
@@ -55,13 +63,24 @@ export function useTranslateStream(task: TranslateTask | null): TranslationState
       );
     });
 
-    const req: ChatPortRequest = { type: 'translate', task };
+    const req: ChatPortRequest = {
+      type: 'translate',
+      task,
+      providerId: selection?.providerId,
+      modelName: selection?.modelName,
+    };
     port.postMessage(req);
 
     return () => {
       port.disconnect();
     };
-  }, [task?.text, task?.targetLang, task?.style]);
+  }, [
+    task?.text,
+    task?.targetLang,
+    task?.style,
+    selection?.providerId,
+    selection?.modelName,
+  ]);
 
   return state;
 }
