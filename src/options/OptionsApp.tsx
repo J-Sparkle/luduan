@@ -1,5 +1,15 @@
 import { useEffect, useState } from 'react';
-import { Plus, Trash2, Eye, EyeOff, Check, ExternalLink, Sparkles } from 'lucide-react';
+import {
+  Plus,
+  Trash2,
+  Eye,
+  EyeOff,
+  Check,
+  ExternalLink,
+  Sparkles,
+  CheckCircle2,
+  X,
+} from 'lucide-react';
 import {
   loadProviders,
   upsertProvider,
@@ -38,6 +48,8 @@ export function OptionsApp() {
           </div>
         </div>
       </header>
+
+      <ReadyBanner providers={providers} />
 
       <main className="max-w-5xl mx-auto px-6 py-6 grid grid-cols-[260px_1fr] gap-6">
         {/* Provider list */}
@@ -179,8 +191,10 @@ function ProviderForm({
       const built = adapter.buildRequest(
         {
           model: draft.models[0] ?? 'test',
-          messages: [{ role: 'user', content: 'Hi' }],
-          maxTokens: 8,
+          messages: [
+            { role: 'user', content: 'Reply with the single word: ok' },
+          ],
+          maxTokens: 16,
         },
         draft,
       );
@@ -189,10 +203,19 @@ function ProviderForm({
         headers: built.headers,
         body: built.body,
       });
-      if (resp.ok) {
+      if (resp.ok && resp.body) {
+        let sample = '';
+        for await (const chunk of adapter.parseStream(resp.body)) {
+          if (chunk.type === 'text') sample += chunk.delta;
+          if (chunk.type === 'error') throw new Error(chunk.message);
+          if (chunk.type === 'done' || sample.length > 80) break;
+        }
         setTesting('ok');
-        setTestMsg('连接成功');
-      } else {
+        setTestMsg(sample.trim() ? `模型回复："${sample.trim()}"` : '连接成功');
+        // First successful test auto-enables this provider — removes the most
+        // common onboarding trap where users forget the toggle.
+        if (!draft.enabled) update({ enabled: true });
+      } else if (!resp.ok) {
         const text = await resp.text();
         const err = adapter.mapError(resp.status, text);
         setTesting('fail');
@@ -207,13 +230,12 @@ function ProviderForm({
   return (
     <div className="ld-card p-6 space-y-5">
       <div className="flex items-start justify-between">
-        <div className="space-y-1 flex-1 mr-4">
+        <div className="flex-1 mr-4">
           <input
             value={draft.name}
             onChange={(e) => update({ name: e.target.value })}
             className="text-lg font-semibold bg-transparent outline-none border-b border-transparent hover:border-slate-200 focus:border-brand-400 w-full"
           />
-          <p className="text-xs text-slate-500">协议：{draft.protocol}</p>
         </div>
         <label className="flex items-center gap-2 cursor-pointer">
           <input
@@ -226,13 +248,29 @@ function ProviderForm({
         </label>
       </div>
 
-      <Field label="Base URL">
-        <input
-          value={draft.baseUrl}
-          onChange={(e) => update({ baseUrl: e.target.value })}
-          className="ld-input font-mono text-xs"
-        />
-      </Field>
+      <div className="grid grid-cols-[160px_1fr] gap-3">
+        <Field label="协议">
+          <select
+            value={draft.protocol}
+            onChange={(e) =>
+              update({ protocol: e.target.value as StoredProvider['protocol'] })
+            }
+            className="ld-input"
+          >
+            <option value="openai">OpenAI 兼容</option>
+            <option value="anthropic">Anthropic</option>
+            <option value="gemini">Gemini</option>
+          </select>
+        </Field>
+        <Field label="Base URL">
+          <input
+            value={draft.baseUrl}
+            onChange={(e) => update({ baseUrl: e.target.value })}
+            placeholder="https://api.example.com/v1"
+            className="ld-input font-mono text-xs"
+          />
+        </Field>
+      </div>
 
       <Field label="API Key">
         <div className="relative">
@@ -336,6 +374,53 @@ function ModelsEditor({
           placeholder="输入模型名，回车添加"
           className="ld-input font-mono text-xs"
         />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Shown when at least one provider is fully usable. Tells the user setup is
+ * complete and gives them a one-click way out of the options tab. The banner
+ * is dismissible — closing only hides for the current page load.
+ */
+function ReadyBanner({ providers }: { providers: StoredProvider[] }) {
+  const [dismissed, setDismissed] = useState(false);
+  const ready = providers.filter((p) => p.enabled && p.apiKey && p.models[0]);
+  if (ready.length === 0 || dismissed) return null;
+
+  const canClose = typeof window !== 'undefined' && !!window.close;
+
+  return (
+    <div className="border-b border-emerald-200/60 bg-emerald-50/80">
+      <div className="max-w-5xl mx-auto px-6 py-3 flex items-center gap-3">
+        <CheckCircle2 size={18} className="text-emerald-600 shrink-0" />
+        <div className="flex-1 text-sm">
+          <span className="font-medium text-emerald-900">已就绪</span>
+          <span className="text-emerald-700/80 ml-1.5">
+            · {ready.length} 个 Provider 可用（{ready
+              .map((p) => `${p.name} · ${p.models[0]}`)
+              .join('， ')}）
+          </span>
+          <span className="text-emerald-700/60 ml-1.5">
+            设置已自动保存，到任意网页选中文本即可翻译。
+          </span>
+        </div>
+        {canClose && (
+          <button
+            onClick={() => window.close()}
+            className="ld-btn-primary !py-1 !px-3 text-xs"
+          >
+            关闭设置页
+          </button>
+        )}
+        <button
+          onClick={() => setDismissed(true)}
+          className="ld-btn-ghost h-7 w-7 p-0 rounded-full text-emerald-700"
+          aria-label="收起"
+        >
+          <X size={14} />
+        </button>
       </div>
     </div>
   );
