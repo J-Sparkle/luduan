@@ -1,0 +1,33 @@
+name: ✨ 功能建议
+description: 建议一个新功能
+title: '[Feat] '
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: 你希望解决什么问题？
+      placeholder: 我希望能 X，因为现在 Y...
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: 你设想的解决方案
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 其他考虑过的方案
+
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: 是否符合产品定位？
+      description: 甪端聚焦"AI 划词翻译 + 相关阅读推荐"，请确认你的建议在这个范围内。
+      options:
+        - label: 我已阅读 README 并确认该建议在产品定位内
+          required: true

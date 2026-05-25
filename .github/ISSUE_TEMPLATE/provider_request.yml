@@ -1,0 +1,67 @@
+name: 🔌 新增 AI Provider
+description: 请求支持某个 AI 厂商或模型
+title: '[Provider] '
+labels: [provider]
+body:
+  - type: input
+    id: name
+    attributes:
+      label: 厂商名称
+      placeholder: 例如 Mistral / 阿里通义千问 / xAI Grok
+    validations:
+      required: true
+
+  - type: input
+    id: baseUrl
+    attributes:
+      label: API Base URL
+      placeholder: 例如 https://api.mistral.ai/v1
+    validations:
+      required: true
+
+  - type: dropdown
+    id: protocol
+    attributes:
+      label: 协议
+      options:
+        - OpenAI 兼容（推荐，仅需加 preset）
+        - Anthropic 兼容
+        - Gemini 兼容
+        - 自定义协议（需要新写 Adapter）
+    validations:
+      required: true
+
+  - type: input
+    id: signup
+    attributes:
+      label: 申请 Key 的链接
+      placeholder: 例如 https://console.mistral.ai/api-keys/
+
+  - type: textarea
+    id: models
+    attributes:
+      label: 建议的默认模型列表
+      placeholder: |
+        - mistral-large-latest
+        - codestral-latest
+
+  - type: input
+    id: free
+    attributes:
+      label: 是否有免费额度？
+      placeholder: 例如：每月 100 万 token 免费 / 否
+
+  - type: textarea
+    id: docs
+    attributes:
+      label: 厂商 API 文档链接
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: willing
+    attributes:
+      label: 你愿意自己提 PR 吗？
+      options:
+        - label: 我愿意贡献这个 PR
+        - label: 仅提出请求，希望他人实现

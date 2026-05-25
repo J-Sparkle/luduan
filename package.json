@@ -1,0 +1,47 @@
+{
+  "name": "luduan",
+  "displayName": "Luduan 甪端",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "甪端 · 开源 AI 划词翻译浏览器插件 — 通晓四夷之语，照见万物之意。",
+  "license": "MIT",
+  "homepage": "https://github.com/J-Sparkle/luduan",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint . --ext .ts,.tsx",
+    "typecheck": "tsc --noEmit",
+    "zip": "npm run build && cd dist && zip -r ../luduan.zip ."
+  },
+  "dependencies": {
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.460.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "tailwind-merge": "^2.5.4",
+    "zustand": "^4.5.5"
+  },
+  "devDependencies": {
+    "@crxjs/vite-plugin": "2.0.0-beta.28",
+    "@types/chrome": "^0.0.279",
+    "@types/node": "^20.16.10",
+    "@types/react": "^18.3.11",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.2",
+    "autoprefixer": "^10.4.20",
+    "jsdom": "^29.1.1",
+    "postcss": "^8.4.47",
+    "tailwindcss": "^3.4.13",
+    "typescript": "^5.5.4",
+    "vite": "^5.4.8",
+    "vitest": "^2.1.2"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "packageManager": "pnpm@9.0.0"
+}
