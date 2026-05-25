@@ -16,6 +16,7 @@ import {
   deleteProvider,
   newProviderId,
   type StoredProvider,
+  type ProviderParams,
 } from '@/shared/store/providers';
 import { PROVIDER_PRESETS } from '@/shared/providers/presets';
 import { getAdapter } from '@/shared/providers/adapters';
@@ -184,13 +185,28 @@ function ProviderForm({
   };
 
   const testConnection = async () => {
+    if (!draft.apiKey.trim()) {
+      setTesting('fail');
+      setTestMsg('请先填 API Key');
+      return;
+    }
+    if (!draft.baseUrl.trim()) {
+      setTesting('fail');
+      setTestMsg('请先填 Base URL');
+      return;
+    }
+    if (!draft.models[0]) {
+      setTesting('fail');
+      setTestMsg('请先添加至少一个模型名（在下方输入框输入后按回车）');
+      return;
+    }
     setTesting('running');
     setTestMsg('');
     try {
       const adapter = getAdapter(draft.protocol);
       const built = adapter.buildRequest(
         {
-          model: draft.models[0] ?? 'test',
+          model: draft.models[0],
           messages: [
             { role: 'user', content: 'Reply with the single word: ok' },
           ],
@@ -272,6 +288,24 @@ function ProviderForm({
         </Field>
       </div>
 
+      {draft.protocol === 'anthropic' && (
+        <Field label="鉴权方式">
+          <select
+            value={draft.authStyle ?? 'native'}
+            onChange={(e) =>
+              update({ authStyle: e.target.value as StoredProvider['authStyle'] })
+            }
+            className="ld-input"
+          >
+            <option value="native">x-api-key (Anthropic 官方)</option>
+            <option value="bearer">Authorization: Bearer (网关 / 代理)</option>
+          </select>
+          <p className="text-[11px] text-slate-500 mt-1">
+            走公司内网网关时通常选 Bearer；直连 api.anthropic.com 选 x-api-key。
+          </p>
+        </Field>
+      )}
+
       <Field label="API Key">
         <div className="relative">
           <input
@@ -298,6 +332,11 @@ function ProviderForm({
           onChange={(models) => update({ models })}
         />
       </Field>
+
+      <AdvancedParams
+        params={draft.params}
+        onChange={(params) => update({ params })}
+      />
 
       <div className="flex items-center gap-2 pt-2 border-t border-black/[0.05]">
         <button onClick={testConnection} className="ld-btn-primary">
@@ -342,6 +381,16 @@ function ModelsEditor({
   onChange: (m: string[]) => void;
 }) {
   const [input, setInput] = useState('');
+  const commit = () => {
+    const v = input.trim();
+    if (!v) return;
+    if (models.includes(v)) {
+      setInput('');
+      return;
+    }
+    onChange([...models, v]);
+    setInput('');
+  };
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap gap-1.5">
@@ -366,16 +415,124 @@ function ModelsEditor({
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === 'Enter' && input.trim()) {
-              onChange([...models, input.trim()]);
-              setInput('');
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              commit();
             }
           }}
-          placeholder="输入模型名，回车添加"
-          className="ld-input font-mono text-xs"
+          // Also commit on blur so users who tab/click away don't silently
+          // lose what they typed — the original "Enter only" behavior was a
+          // foot-gun that caused testConnection to fall through to a bogus
+          // model name.
+          onBlur={commit}
+          placeholder="输入模型名，回车或失焦添加"
+          className="ld-input font-mono text-xs flex-1"
         />
+        <button
+          type="button"
+          onClick={commit}
+          disabled={!input.trim()}
+          className="ld-btn-primary !px-3"
+        >
+          <Plus size={14} /> 添加
+        </button>
       </div>
+      {models.length === 0 && (
+        <p className="text-[11px] text-amber-600">
+          ⚠ 至少需要添加 1 个模型名才能测试连接并使用
+        </p>
+      )}
     </div>
+  );
+}
+
+/**
+ * Optional sampling-parameter overrides per provider. Collapsed by default
+ * because most users don't need it. Empty inputs mean "don't send the field
+ * at all" — important because some gateway-fronted models (e.g. Claude Opus
+ * 4.7 via internal proxies) reject the `temperature` parameter outright.
+ */
+/**
+ * Optional sampling-parameter overrides per provider. Empty inputs mean
+ * "don't send the field at all" — important because some gateway-fronted
+ * models (e.g. Claude Opus 4.7 via internal proxies) reject the
+ * `temperature` parameter outright. Visible by default so users can find it
+ * without hunting through a collapsed section.
+ */
+function AdvancedParams({
+  params,
+  onChange,
+}: {
+  params: ProviderParams | undefined;
+  onChange: (p: ProviderParams | undefined) => void;
+}) {
+  const current = params ?? {};
+
+  // Empty string ⇒ undefined ⇒ field omitted from the request body.
+  const setNumber = (key: keyof ProviderParams, raw: string) => {
+    const next: ProviderParams = { ...current };
+    if (raw === '') {
+      delete next[key];
+    } else {
+      const n = Number(raw);
+      if (Number.isFinite(n)) next[key] = n;
+    }
+    const hasAny = Object.keys(next).length > 0;
+    onChange(hasAny ? next : undefined);
+  };
+
+  return (
+    <Field label="采样参数（可选 · 留空即不发送该字段）">
+      <div className="grid grid-cols-3 gap-3">
+        <div>
+          <label className="text-[11px] text-slate-500 mb-1 block">
+            Temperature
+          </label>
+          <input
+            type="number"
+            step="0.1"
+            min="0"
+            max="2"
+            value={current.temperature ?? ''}
+            onChange={(e) => setNumber('temperature', e.target.value)}
+            placeholder="留空 = 模型默认"
+            className="ld-input"
+          />
+        </div>
+        <div>
+          <label className="text-[11px] text-slate-500 mb-1 block">Top P</label>
+          <input
+            type="number"
+            step="0.05"
+            min="0"
+            max="1"
+            value={current.topP ?? ''}
+            onChange={(e) => setNumber('topP', e.target.value)}
+            placeholder="留空 = 模型默认"
+            className="ld-input"
+          />
+        </div>
+        <div>
+          <label className="text-[11px] text-slate-500 mb-1 block">
+            Max Tokens
+          </label>
+          <input
+            type="number"
+            step="64"
+            min="1"
+            value={current.maxTokens ?? ''}
+            onChange={(e) => setNumber('maxTokens', e.target.value)}
+            placeholder="留空 = 模型默认"
+            className="ld-input"
+          />
+        </div>
+      </div>
+      <p className="text-[11px] text-slate-500 mt-2 leading-relaxed">
+        💡 翻译追求稳定可填 <code className="bg-surface-subtle px-1 rounded">temperature=0</code> 或 <code className="bg-surface-subtle px-1 rounded">0.3</code>。
+        遇到模型/网关报错（如 Claude Opus 4.7 经网关不接受 temperature），
+        <b>清空对应字段</b>重试即可。
+      </p>
+    </Field>
   );
 }
 
