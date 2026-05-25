@@ -53,7 +53,7 @@ Background 端的 Port 处理器。Content 端用 `chrome.runtime.connect({ name
 
 ### `src/shared/store/providers.ts`
 
-`chrome.storage.local` 上的轻量 KV 包装，存 `StoredProvider[]`。Key 字段未来会用 AES-GCM 加密（见 SECURITY.md）。
+`chrome.storage.local` 上的轻量 KV 包装，存 `StoredProvider[]`。当前 `apiKey` 字段明文存储；AES-GCM 加密层在路线图中（见 [SECURITY.md](../SECURITY.md)）。
 
 ### `src/content/`
 

@@ -6,17 +6,17 @@
 
 **我们防护：**
 
-- ✅ 浏览器中其他扩展无法直接读取你的 API Key（chrome.storage.local 默认隔离 + AES-GCM 加密）
 - ✅ 网页 JavaScript 无法访问插件的内部状态（content script 在隔离世界 + Shadow DOM）
+- ✅ 其他 Chrome 扩展无法读取本插件的 storage（chrome.storage.local 受扩展隔离）
 - ✅ Key 不会同步到云端（不使用 chrome.storage.sync 存敏感字段）
 
-**我们不防护：**
+**我们暂不防护（v0.x）：**
 
-- ❌ 拥有你本机物理访问权限的攻击者（默认加密密钥派生自设备本地随机种子，可读取）
+- ❌ 拥有你本机物理访问权限的攻击者（**API Key 当前明文存于 `chrome.storage.local`**）
 - ❌ 恶意的 AI 厂商（你直接把数据发给了它）
 - ❌ 中间人攻击你的网络（请确保 baseUrl 使用 HTTPS）
 
-若启用「主密码」高级模式，第一项也能缓解：密钥派生自你输入的密码，不存盘。
+> **关于加密**：当前版本 API Key 以明文存储在 `chrome.storage.local`。AES-GCM 加密层和可选"主密码"模式在 [路线图](README.md#-路线图) 中。在该工作完成前，请避免在你不信任的设备上使用本插件。
 
 ## 支持版本
 
