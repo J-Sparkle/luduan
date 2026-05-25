@@ -20,12 +20,19 @@ export const anthropicAdapter: ProviderAdapter = {
     const base = cfg.baseUrl.replace(/\/+$/, '');
     const systems = req.messages.filter((m) => m.role === 'system').map((m) => m.content);
     const messages = req.messages.filter((m) => m.role !== 'system');
+    // Some gateways proxy Anthropic bodies but accept OpenAI-style Bearer
+    // auth (e.g. internal company gateways). Switch the auth header style
+    // accordingly while leaving the Anthropic protocol fields intact.
+    const authHeaders: Record<string, string> =
+      cfg.authStyle === 'bearer'
+        ? { Authorization: `Bearer ${cfg.apiKey}` }
+        : { 'x-api-key': cfg.apiKey };
     return {
       url: `${base}/messages`,
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': cfg.apiKey,
+        ...authHeaders,
         'anthropic-version': '2023-06-01',
         'anthropic-dangerous-direct-browser-access': 'true',
         ...(cfg.extraHeaders ?? {}),
@@ -90,8 +97,14 @@ export const anthropicAdapter: ProviderAdapter = {
     if (status === 429) {
       return { code: ErrorCode.RATE_LIMIT, message: '请求过于频繁' };
     }
-    if (status === 404 || /not_found|model/.test(lower) && status === 400) {
+    if ((status === 400 || status === 404) && /not_found|model.*not.*found|invalid.*model/.test(lower)) {
       return { code: ErrorCode.MODEL_NOT_FOUND, message: '模型不存在' };
+    }
+    if (status === 404) {
+      return {
+        code: ErrorCode.MODEL_NOT_FOUND,
+        message: `HTTP 404 · 接口路径不存在。检查 Base URL 是否正确（Anthropic 协议会自动追加 /messages）。响应：${body.slice(0, 120)}`,
+      };
     }
     if (/context|too long|maximum/.test(lower)) {
       return { code: ErrorCode.CONTEXT_TOO_LONG, message: '上下文超长' };

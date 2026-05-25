@@ -11,6 +11,28 @@ const cfg = {
   apiKey: 'sk-ant-test',
 };
 
+describe('anthropicAdapter.buildRequest auth styles', () => {
+  it('defaults to x-api-key header (native)', () => {
+    const req = anthropicAdapter.buildRequest(
+      { model: 'm', messages: [{ role: 'user', content: 'q' }] },
+      cfg,
+    );
+    expect(req.headers['x-api-key']).toBe('sk-ant-test');
+    expect(req.headers.Authorization).toBeUndefined();
+  });
+
+  it('uses Authorization: Bearer when authStyle=bearer (gateway mode)', () => {
+    const req = anthropicAdapter.buildRequest(
+      { model: 'm', messages: [{ role: 'user', content: 'q' }] },
+      { ...cfg, authStyle: 'bearer' },
+    );
+    expect(req.headers.Authorization).toBe('Bearer sk-ant-test');
+    expect(req.headers['x-api-key']).toBeUndefined();
+    // Other Anthropic headers still present
+    expect(req.headers['anthropic-version']).toBe('2023-06-01');
+  });
+});
+
 describe('anthropicAdapter.buildRequest', () => {
   it('separates system from messages, uses x-api-key header', () => {
     const req = anthropicAdapter.buildRequest(

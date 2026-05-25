@@ -11,6 +11,13 @@ export const MSG = {
 export interface ChatPortRequest {
   type: 'translate';
   task: TranslateTask;
+  /**
+   * Optional explicit (provider, model) override. If omitted, the background
+   * picks the first enabled provider's first model — the legacy "default"
+   * behavior. Set both fields to honor the user's per-translation choice.
+   */
+  providerId?: string;
+  modelName?: string;
 }
 
 export type ChatPortMessage =
@@ -47,7 +54,16 @@ async function runChat(
   signal: AbortSignal,
 ): Promise<void> {
   const providers = await loadProviders();
-  const provider = providers.find((p) => p.enabled) ?? providers[0];
+
+  // Resolution priority:
+  //   1. Explicit providerId from the request (user picked from the card
+  //      selector) — and we verify the model still belongs to it.
+  //   2. First enabled provider's first model (legacy default).
+  let provider = req.providerId
+    ? providers.find((p) => p.id === req.providerId)
+    : undefined;
+  provider ??= providers.find((p) => p.enabled) ?? providers[0];
+
   if (!provider) {
     sendError(port, {
       code: ErrorCode.UNKNOWN,
@@ -55,7 +71,11 @@ async function runChat(
     });
     return;
   }
-  const modelName = provider.models[0];
+
+  const modelName =
+    (req.modelName && provider.models.includes(req.modelName)
+      ? req.modelName
+      : provider.models[0]);
   if (!modelName) {
     sendError(port, {
       code: ErrorCode.MODEL_NOT_FOUND,
@@ -70,15 +90,27 @@ async function runChat(
     protocol: provider.protocol,
     baseUrl: provider.baseUrl,
     apiKey: provider.apiKey,
+    authStyle: provider.authStyle,
     extraHeaders: provider.extraHeaders,
   };
   const adapter = getAdapter(provider.protocol);
   const messages = buildPrompt(req.task);
+  // We intentionally don't default any sampling parameter. Some gateway
+  // -fronted models (e.g. Claude Opus 4.7 via internal proxies) reject
+  // specific parameters outright. Users can fill them in per-provider via
+  // the options page; leaving a field empty omits it from the request body.
+  // Anthropic protocol requires max_tokens — the adapter falls back to 4096
+  // when undefined, so requests still succeed.
   const chat: ChatRequest = {
     model: modelName,
     messages,
-    temperature: 0.3,
-    maxTokens: 1024,
+    ...(provider.params?.maxTokens !== undefined && {
+      maxTokens: provider.params.maxTokens,
+    }),
+    ...(provider.params?.temperature !== undefined && {
+      temperature: provider.params.temperature,
+    }),
+    ...(provider.params?.topP !== undefined && { topP: provider.params.topP }),
     signal,
   };
 

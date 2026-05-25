@@ -39,12 +39,24 @@ export enum ErrorCode {
 
 export type ProtocolId = 'openai' | 'anthropic' | 'gemini' | 'azure' | 'custom';
 
+/**
+ * How the API key is sent.
+ *  - 'native'   — protocol's official scheme:
+ *                   openai     → Authorization: Bearer
+ *                   anthropic  → x-api-key
+ *                   gemini     → ?key= query param
+ *  - 'bearer'   — Authorization: Bearer (useful for gateways that proxy
+ *                 Anthropic/Gemini bodies but accept OpenAI-style auth).
+ */
+export type AuthStyle = 'native' | 'bearer';
+
 export interface ProviderConfig {
   id: string;
   name: string;
   protocol: ProtocolId;
   baseUrl: string;
   apiKey: string;
+  authStyle?: AuthStyle;
   /** Extra headers merged into every request */
   extraHeaders?: Record<string, string>;
   /** Azure-specific: api-version query param */

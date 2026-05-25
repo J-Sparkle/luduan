@@ -98,4 +98,15 @@ describe('openaiAdapter.mapError', () => {
       openaiAdapter.mapError(400, "This model's maximum context length is 8192").code,
     ).toBe(ErrorCode.CONTEXT_TOO_LONG);
   });
+  it('treats real model_not_found as MODEL_NOT_FOUND', () => {
+    expect(openaiAdapter.mapError(404, 'model does not exist').code).toBe(
+      ErrorCode.MODEL_NOT_FOUND,
+    );
+  });
+  it('on bare 404, surfaces "接口路径不存在" hint instead of misleading model error', () => {
+    const err = openaiAdapter.mapError(404, '<html>404 Not Found</html>');
+    expect(err.code).toBe(ErrorCode.MODEL_NOT_FOUND);
+    expect(err.message).toContain('接口路径不存在');
+    expect(err.message).toContain('Base URL');
+  });
 });

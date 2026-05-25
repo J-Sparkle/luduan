@@ -1,4 +1,15 @@
-import type { ProtocolId } from '@/shared/providers/types';
+import type { AuthStyle, ProtocolId } from '@/shared/providers/types';
+
+export interface ProviderParams {
+  /** Sampling temperature. Leave undefined to let the model use its default
+   *  (some gateways reject the parameter entirely — e.g. Claude Opus 4.7 via
+   *  internal proxies). */
+  temperature?: number;
+  /** Nucleus sampling cutoff (0-1). Optional. */
+  topP?: number;
+  /** Max output tokens. Falls back to 1024 if undefined. */
+  maxTokens?: number;
+}
 
 export interface StoredProvider {
   id: string;
@@ -6,7 +17,9 @@ export interface StoredProvider {
   protocol: ProtocolId;
   baseUrl: string;
   apiKey: string;
+  authStyle?: AuthStyle;
   extraHeaders?: Record<string, string>;
+  params?: ProviderParams;
   /** Model names the user enabled, in priority order. */
   models: string[];
   enabled: boolean;

@@ -81,8 +81,19 @@ export const openaiAdapter: ProviderAdapter = {
         ? { code: ErrorCode.QUOTA_EXCEEDED, message: '配额已用尽' }
         : { code: ErrorCode.RATE_LIMIT, message: '请求过于频繁，请稍后再试' };
     }
-    if (status === 404 || /model.*not.*found|does not exist/.test(lower)) {
+    // Real "model not found" responses always say so in the body; a bare 404
+    // with an unrelated body almost always means the URL path is wrong
+    // (e.g. Base URL points at a host that doesn't actually serve
+    // /chat/completions). Distinguish them so users aren't led to debug
+    // the model name when the URL is the real problem.
+    if (/model.*not.*found|does not exist|invalid model/.test(lower)) {
       return { code: ErrorCode.MODEL_NOT_FOUND, message: '模型不存在或无权访问' };
+    }
+    if (status === 404) {
+      return {
+        code: ErrorCode.MODEL_NOT_FOUND,
+        message: `HTTP 404 · 接口路径不存在。检查 Base URL 是否正确（OpenAI 协议会自动追加 /chat/completions）。响应：${body.slice(0, 120)}`,
+      };
     }
     if (/context length|maximum context|too long/.test(lower)) {
       return { code: ErrorCode.CONTEXT_TOO_LONG, message: '上下文长度超出模型限制' };
