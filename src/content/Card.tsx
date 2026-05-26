@@ -1,26 +1,12 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
-import {
-  X,
-  Copy,
-  Volume2,
-  ChevronDown,
-  ChevronUp,
-  Sparkles,
-  Settings,
-  AlertCircle,
-  Loader2,
-  GripHorizontal,
-  ArrowDownToLine,
-} from 'lucide-react';
 import type { SelectionAnchor } from './useSelection';
 import { useTranslateStream, type ModelSelection } from './useTranslateStream';
 import { useDraggable } from './useDraggable';
 import { useProviders } from './useProviders';
-import { embedTranslationInline } from './inlineEmbed';
 import { loadLastModel, saveLastModel } from '@/shared/store/last-model';
 import type { StoredProvider } from '@/shared/store/providers';
 import type { TranslateTask } from '@/shared/prompts';
-import { cn } from '@/shared/ui/cn';
+import { Mark, Caret, Spinner, cn, openOptions } from '@/shared/ui';
 
 interface CardProps {
   anchor: SelectionAnchor;
@@ -39,7 +25,17 @@ const LANGUAGES = [
 
 const CARD_WIDTH = 380;
 const CARD_GAP = 12;
+const FOLD_SIZE = 16;
 
+/**
+ * Bookish translation card. Novelty: paper-fold corner at top-right
+ * (a small 16×16 triangular overlay that suggests a turned page).
+ *
+ * Outer: surface bg, ink-rule border, sm radius, pop shadow.
+ * Top bar: drag handle with 2×3 dot grid + mark + EN→中文 indicator + 4 mini buttons.
+ * Body: starting | streaming (with caret) | done | error.
+ * Action bar: 朗读 / 复制 / 风格 + model badge right-aligned.
+ */
 export function Card({ anchor, onClose }: CardProps) {
   const [targetLang, setTargetLang] = useState('中文');
   const [showOriginal, setShowOriginal] = useState(false);
@@ -50,15 +46,12 @@ export function Card({ anchor, onClose }: CardProps) {
     [anchor.text, targetLang, style],
   );
 
-  // Live providers list (auto-refreshes if user edits in another tab).
   const providers = useProviders();
   const usableProviders = useMemo(
     () => providers.filter((p) => p.enabled && p.apiKey && p.models.length > 0),
     [providers],
   );
 
-  // Currently selected (providerId, modelName). Initialized from the
-  // persisted "last used" value, falling back to the first usable model.
   const [selection, setSelection] = useState<ModelSelection | null>(null);
   useEffect(() => {
     if (selection || usableProviders.length === 0) return;
@@ -79,16 +72,12 @@ export function Card({ anchor, onClose }: CardProps) {
       cancelled = true;
     };
   }, [usableProviders, selection]);
-
-  // Persist any user choice so the next selection starts from the same model.
   useEffect(() => {
     if (selection) void saveLastModel(selection);
   }, [selection]);
 
   const stream = useTranslateStream(task, selection);
 
-  // Initial position based on the selection rect; once the user drags, the
-  // draggable hook takes over and stops following this.
   const initialPos = useMemo(() => {
     const spaceBelow = window.innerHeight - anchor.rect.bottom;
     const above = spaceBelow < 320 && anchor.rect.top > 320;
@@ -108,18 +97,6 @@ export function Card({ anchor, onClose }: CardProps) {
 
   const isLoading = stream.status === 'starting' || stream.status === 'streaming';
 
-  const handleEmbed = () => {
-    if (!anchor.containerEl) return;
-    embedTranslationInline({
-      container: anchor.containerEl,
-      task,
-      placement: 'below',
-      providerId: selection?.providerId,
-      modelName: selection?.modelName,
-    });
-    onClose();
-  };
-
   return (
     <div
       ref={cardRef}
@@ -128,138 +105,181 @@ export function Card({ anchor, onClose }: CardProps) {
         top: pos.top,
         left: pos.left,
         width: CARD_WIDTH,
+        boxShadow: isDragging
+          ? '0 14px 36px rgba(22,22,22,0.16), 0 0 0 1px rgba(22,22,22,0.20)'
+          : undefined,
+        opacity: isDragging ? 0.85 : 1,
       }}
-      className="animate-pop-in ld-card overflow-hidden"
+      className="
+        bg-surface border border-ink-rule rounded-sm shadow-pop
+        animate-pop-in overflow-visible
+      "
       onMouseDown={(e) => e.stopPropagation()}
+      role="dialog"
+      aria-label="翻译结果"
     >
-      {/* Header (draggable handle) */}
+      {/* Paper-fold corner */}
+      <span
+        aria-hidden
+        className="absolute top-0 right-0 pointer-events-none"
+        style={{
+          width: FOLD_SIZE,
+          height: FOLD_SIZE,
+          background:
+            'linear-gradient(225deg, transparent 50%, #F4F1EA 50%)',
+          borderLeft: '1px solid rgb(22 22 22 / 0.10)',
+          borderBottom: '1px solid rgb(22 22 22 / 0.10)',
+          borderBottomLeftRadius: 4,
+        }}
+      />
+
+      {/* Top bar — drag handle */}
       <div
         ref={headerRef}
         className={cn(
-          'flex items-center justify-between px-3 py-2.5 border-b border-black/[0.05] select-none',
+          'h-9 flex items-center justify-between gap-2 pl-3 pr-2 border-b border-ink-hair select-none',
           isDragging ? 'cursor-grabbing' : 'cursor-grab',
         )}
-        title="按住拖动"
       >
-        <div className="flex items-center gap-1.5 min-w-0">
-          <GripHorizontal
-            size={14}
-            className="text-slate-300 shrink-0"
-            aria-hidden
-          />
-          <div className="flex h-6 w-6 items-center justify-center rounded-md bg-gradient-to-br from-brand-500 to-accent text-[11px] font-bold text-white shrink-0">
-            甪
-          </div>
+        <div className="flex items-center gap-2.5 min-w-0">
+          <DragDots />
+          <Mark size={14} color="#161616" accent="oklch(0.42 0.09 252)" />
+          <span className="latin text-[11px] text-ink-mute">EN</span>
+          <span className="text-ink-faint text-[11px]">→</span>
           <select
             value={targetLang}
             onChange={(e) => setTargetLang(e.target.value)}
-            className="text-sm font-medium bg-transparent outline-none cursor-pointer hover:text-brand-500 min-w-0"
+            className="bg-transparent outline-none text-[11px] text-ink-soft cursor-pointer hover:text-ink"
           >
             {LANGUAGES.map((l) => (
               <option key={l.code} value={l.code}>
-                译至 {l.label}
+                {l.label}
               </option>
             ))}
           </select>
         </div>
-        <div className="flex items-center gap-0.5">
-          {anchor.containerEl && (
-            <button
-              onClick={handleEmbed}
-              className="ld-btn-ghost h-7 px-2 text-[11px] gap-1"
-              title="把译文嵌入原文下方"
-              aria-label="嵌入页面"
-            >
-              <ArrowDownToLine size={12} />
-              嵌入
-            </button>
-          )}
-          <button
-            onClick={() => chrome.runtime.openOptionsPage()}
-            className="ld-btn-ghost h-7 w-7 p-0 rounded-full"
-            aria-label="设置"
-          >
-            <Settings size={14} />
-          </button>
-          <button
-            onClick={onClose}
-            className="ld-btn-ghost h-7 w-7 p-0 rounded-full"
-            aria-label="关闭"
-          >
-            <X size={14} />
-          </button>
+        <div className="flex items-center gap-0.5 mr-3">
+          <MiniBtn title="设置" onClick={openOptions}>
+            <CogGlyph />
+          </MiniBtn>
+          <MiniBtn title="关闭" onClick={onClose}>
+            ×
+          </MiniBtn>
         </div>
       </div>
 
-      {/* Original (collapsed by default) */}
+      {/* Collapsible source */}
       <button
+        type="button"
         onClick={() => setShowOriginal((v) => !v)}
-        className="w-full px-4 py-1.5 text-[11px] text-slate-500 hover:bg-surface-subtle flex items-center justify-between"
+        className="w-full flex items-center justify-between px-3.5 py-2 text-[11px] text-ink-mute hover:bg-surface-alt/70 border-b border-ink-hair"
       >
-        <span>原文 ({anchor.text.length} 字符)</span>
-        {showOriginal ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+        <span className="flex items-center gap-1.5">
+          <Chevron open={showOriginal} />
+          <span className="latin italic">
+            {anchor.text.length > 60
+              ? anchor.text.slice(0, 60) + '…'
+              : anchor.text}
+          </span>
+        </span>
+        <span className="mono text-[10px]">{anchor.text.length} 字</span>
       </button>
       {showOriginal && (
-        <div className="px-4 pb-2 text-[13px] text-slate-600 max-h-24 overflow-auto ld-scrollbar bg-surface-muted/40">
+        <div className="px-4 py-2 text-[13px] text-ink-soft max-h-28 overflow-auto ld-scrollbar bg-surface-alt/40 border-b border-ink-hair latin italic leading-relaxed">
           {anchor.text}
         </div>
       )}
 
-      {/* Translation body */}
-      <div className="px-4 py-3 min-h-[80px] max-h-[300px] overflow-auto ld-scrollbar">
+      {/* Body */}
+      <div className="px-[18px] py-4 min-h-[120px] max-h-[300px] overflow-auto ld-scrollbar">
         {stream.status === 'starting' && (
-          <div className="flex items-center gap-2 text-sm text-slate-500">
-            <Loader2 size={14} className="animate-spin" />
-            正在请求模型...
+          <div className="flex items-center gap-2 text-[13px] text-ink-mute">
+            <Spinner size={14} />
+            <span>正在请求模型⋯</span>
           </div>
         )}
-        {stream.status === 'error' && (
-          <div className="flex items-start gap-2 text-sm text-red-500">
-            <AlertCircle size={14} className="mt-0.5 shrink-0" />
-            <div>
-              <div className="font-medium">翻译失败</div>
-              <div className="text-xs text-red-400 mt-0.5">{stream.error}</div>
-            </div>
-          </div>
-        )}
+        {stream.status === 'error' && <ErrorBlock message={stream.error} />}
         {(stream.status === 'streaming' || stream.status === 'done') && (
-          <div className="text-[14px] leading-relaxed text-slate-800 whitespace-pre-wrap">
+          <div className="text-[14.5px] leading-[1.85] text-ink whitespace-pre-wrap">
             {stream.text}
-            {isLoading && (
-              <span className="inline-block w-1.5 h-4 bg-brand-500 ml-0.5 animate-pulse align-middle" />
-            )}
+            {isLoading && <Caret />}
           </div>
         )}
       </div>
 
       {/* Action bar */}
-      <div className="flex items-center justify-between px-3 py-2 border-t border-black/[0.05] bg-surface-muted/60">
-        <div className="flex items-center gap-1">
-          <ActionButton
-            icon={<Volume2 size={13} />}
-            label="朗读"
-            onClick={() => speak(stream.text, targetLang)}
-            disabled={!stream.text}
+      {stream.status === 'done' && (
+        <div className="flex items-center justify-between px-3.5 py-2 border-t border-ink-hair">
+          <div className="flex items-center gap-0.5">
+            <QuietChip
+              icon={<SpeakerGlyph />}
+              label="朗读"
+              onClick={() => speak(stream.text, targetLang)}
+              disabled={!stream.text}
+            />
+            <QuietChip
+              icon={<CopyGlyph />}
+              label="复制"
+              onClick={() => navigator.clipboard.writeText(stream.text)}
+              disabled={!stream.text}
+            />
+            <StyleSelect value={style} onChange={setStyle} />
+          </div>
+          <ModelSelector
+            providers={usableProviders}
+            value={selection}
+            onChange={setSelection}
           />
-          <ActionButton
-            icon={<Copy size={13} />}
-            label="复制"
-            onClick={() => navigator.clipboard.writeText(stream.text)}
-            disabled={!stream.text}
-          />
-          <StyleSelect value={style} onChange={setStyle} />
         </div>
-        <ModelSelector
-          providers={usableProviders}
-          value={selection}
-          onChange={setSelection}
-        />
-      </div>
+      )}
     </div>
   );
 }
 
-function ActionButton({
+// ─────────────────────────────────────────────────────────────────────────────
+// Sub-components
+
+function DragDots() {
+  return (
+    <div
+      className="grid grid-cols-2 gap-[2px] opacity-40"
+      style={{ gridTemplateRows: 'repeat(3, 2px)' }}
+      aria-hidden
+    >
+      {Array.from({ length: 6 }).map((_, i) => (
+        <span
+          key={i}
+          className="block bg-ink rounded-full"
+          style={{ width: 2, height: 2 }}
+        />
+      ))}
+    </div>
+  );
+}
+
+function MiniBtn({
+  children,
+  onClick,
+  title,
+}: {
+  children: React.ReactNode;
+  onClick?: () => void;
+  title?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      aria-label={title}
+      className="inline-flex h-[22px] w-[22px] items-center justify-center text-[11px] text-ink-soft rounded-xs hover:bg-surface-alt hover:text-ink transition-colors"
+    >
+      {children}
+    </button>
+  );
+}
+
+function QuietChip({
   icon,
   label,
   onClick,
@@ -272,10 +292,11 @@ function ActionButton({
 }) {
   return (
     <button
+      type="button"
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        'ld-btn-ghost h-7 px-2 text-[11px]',
+        'h-7 px-2 inline-flex items-center gap-1.5 text-[11px] text-ink-soft rounded-xs hover:bg-surface-alt hover:text-ink',
         disabled && 'opacity-40 cursor-not-allowed',
       )}
     >
@@ -303,7 +324,8 @@ function StyleSelect({
     <select
       value={value}
       onChange={(e) => onChange(e.target.value as TranslateTask['style'])}
-      className="ld-btn-ghost h-7 px-2 text-[11px] bg-transparent outline-none cursor-pointer"
+      className="h-7 px-2 text-[11px] text-ink-soft bg-transparent outline-none rounded-xs cursor-pointer hover:bg-surface-alt hover:text-ink"
+      title="切换翻译风格"
     >
       {STYLES.map((s) => (
         <option key={s.value} value={s.value}>
@@ -314,13 +336,6 @@ function StyleSelect({
   );
 }
 
-/**
- * In-card model picker. Groups options by provider so users can quickly tell
- * which API they're hitting. Hidden when no providers are configured (the
- * 翻译 body will surface that case as an error). Disabled (but still
- * informational) when there is only a single (provider, model) pair to pick
- * from — at that point switching is meaningless.
- */
 function ModelSelector({
   providers,
   value,
@@ -333,18 +348,16 @@ function ModelSelector({
   if (providers.length === 0) {
     return (
       <button
-        onClick={() => chrome.runtime.openOptionsPage()}
-        className="text-[10px] text-amber-600 hover:text-amber-700 flex items-center gap-1"
-        title="去设置页添加 Provider"
+        type="button"
+        onClick={openOptions}
+        className="text-[10.5px] text-warn hover:text-ink latin italic"
       >
-        <Sparkles size={10} /> 未配置模型 →
+        unconfigured →
       </button>
     );
   }
-
-  const totalModels = providers.reduce((sum, p) => sum + p.models.length, 0);
+  const totalModels = providers.reduce((s, p) => s + p.models.length, 0);
   const composite = value ? `${value.providerId}|${value.modelName}` : '';
-
   return (
     <select
       value={composite}
@@ -354,13 +367,7 @@ function ModelSelector({
       }}
       disabled={totalModels <= 1}
       title={totalModels <= 1 ? '只有一个可用模型' : '切换模型即重新翻译'}
-      className={cn(
-        'h-7 px-2 text-[10px] rounded-md bg-transparent outline-none',
-        'text-slate-500 hover:text-brand-500 cursor-pointer',
-        'border border-transparent hover:border-slate-200',
-        'max-w-[180px] truncate',
-        totalModels <= 1 && 'cursor-default hover:text-slate-500 hover:border-transparent',
-      )}
+      className="latin italic text-[10.5px] text-ink-mute bg-transparent outline-none cursor-pointer hover:text-ink max-w-[180px] truncate"
     >
       {providers.map((p) => (
         <optgroup key={p.id} label={p.name}>
@@ -375,10 +382,85 @@ function ModelSelector({
   );
 }
 
+function ErrorBlock({ message }: { message?: string }) {
+  return (
+    <div className="flex items-start gap-3">
+      <span
+        className="inline-flex h-7 w-7 items-center justify-center rounded-full text-err shrink-0"
+        style={{ background: 'oklch(0.95 0.03 28)' }}
+        aria-hidden
+      >
+        !
+      </span>
+      <div className="flex-1 min-w-0">
+        <div className="text-[13.5px] text-err font-medium">请求失败</div>
+        <div className="text-[12px] text-ink-soft mt-1 leading-[1.6]">
+          {message ?? '未知错误'}
+        </div>
+        <div className="mt-3 flex gap-2">
+          <button
+            type="button"
+            onClick={openOptions}
+            className="text-[11px] text-accent hover:opacity-80"
+          >
+            前往设置 →
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Chevron({ open }: { open: boolean }) {
+  return (
+    <svg
+      width="8"
+      height="8"
+      viewBox="0 0 10 10"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.4"
+      strokeLinecap="round"
+      style={{
+        transform: open ? 'rotate(180deg)' : 'none',
+        transition: 'transform .15s',
+      }}
+    >
+      <path d="M2 4 L5 7 L8 4" />
+    </svg>
+  );
+}
+
+function CogGlyph() {
+  return (
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19 12a7 7 0 00-.1-1.2l2-1.5-2-3.4-2.3.9a7 7 0 00-2-1.2L14 3h-4l-.5 2.6a7 7 0 00-2.1 1.2L5 6 3 9.4l2 1.4a7 7 0 000 2.4l-2 1.4L5 18l2.3-.9a7 7 0 002 1.2L10 21h4l.5-2.6a7 7 0 002.1-1.2l2.3.9 2-3.4-2-1.4c.1-.4.1-.8.1-1.2z" />
+    </svg>
+  );
+}
+
+function SpeakerGlyph() {
+  return (
+    <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4">
+      <path d="M3 6v4h2l3 2V4L5 6H3z" />
+      <path d="M11 6c.7.5 1 1.2 1 2s-.3 1.5-1 2" />
+    </svg>
+  );
+}
+
+function CopyGlyph() {
+  return (
+    <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4">
+      <rect x="5" y="5" width="8" height="8" rx="1" />
+      <path d="M3 11V4a1 1 0 011-1h7" />
+    </svg>
+  );
+}
+
 function speak(text: string, lang: string) {
   if (!text || typeof window.speechSynthesis === 'undefined') return;
   const u = new SpeechSynthesisUtterance(text);
-  // Best-effort BCP-47 mapping from our display labels.
   const map: Record<string, string> = {
     中文: 'zh-CN',
     English: 'en-US',

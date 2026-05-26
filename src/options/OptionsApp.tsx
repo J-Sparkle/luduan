@@ -1,26 +1,25 @@
 import { useEffect, useState } from 'react';
 import {
-  Plus,
-  Trash2,
-  Eye,
-  EyeOff,
-  Check,
-  ExternalLink,
-  Sparkles,
-  CheckCircle2,
-  X,
-} from 'lucide-react';
+  Button,
+  Field,
+  Hair,
+  IconBtn,
+  Input,
+  Pill,
+  Switch,
+  Wordmark,
+  cn,
+} from '@/shared/ui';
 import {
-  loadProviders,
-  upsertProvider,
   deleteProvider,
+  loadProviders,
   newProviderId,
-  type StoredProvider,
+  upsertProvider,
   type ProviderParams,
+  type StoredProvider,
 } from '@/shared/store/providers';
 import { PROVIDER_PRESETS } from '@/shared/providers/presets';
 import { getAdapter } from '@/shared/providers/adapters';
-import { cn } from '@/shared/ui/cn';
 
 export function OptionsApp() {
   const [providers, setProviders] = useState<StoredProvider[]>([]);
@@ -37,71 +36,25 @@ export function OptionsApp() {
   const selected = providers.find((p) => p.id === selectedId);
 
   return (
-    <div className="min-h-screen bg-surface-muted">
-      <header className="border-b border-black/[0.05] bg-white">
-        <div className="max-w-5xl mx-auto px-6 py-4 flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-accent text-white font-bold">
-            甪
-          </div>
-          <div>
-            <h1 className="text-lg font-semibold leading-tight">甪端 Luduan</h1>
-            <p className="text-xs text-slate-500">通晓四夷之语 · 设置</p>
+    <div className="min-h-screen bg-paper">
+      <header className="border-b border-ink-hair">
+        <div className="mx-auto max-w-[1024px] flex items-center justify-between px-8 py-5">
+          <Wordmark size={14} />
+          <div className="latin italic text-[12px] text-ink-mute">
+            设 置 · AI 模型
           </div>
         </div>
       </header>
 
       <ReadyBanner providers={providers} />
 
-      <main className="max-w-5xl mx-auto px-6 py-6 grid grid-cols-[260px_1fr] gap-6">
-        {/* Provider list */}
-        <aside className="space-y-1">
-          <div className="flex items-center justify-between mb-2">
-            <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              AI 模型
-            </h2>
-            <button
-              onClick={() => setShowAdd(true)}
-              className="ld-btn-ghost h-7 w-7 p-0 rounded-full"
-              aria-label="添加"
-            >
-              <Plus size={14} />
-            </button>
-          </div>
-
-          {providers.length === 0 && (
-            <div className="ld-card p-4 text-sm text-slate-500">
-              还没有配置任何 Provider。
-              <button
-                onClick={() => setShowAdd(true)}
-                className="ld-btn-primary w-full mt-3"
-              >
-                添加第一个 →
-              </button>
-            </div>
-          )}
-
-          {providers.map((p) => (
-            <button
-              key={p.id}
-              onClick={() => setSelectedId(p.id)}
-              className={cn(
-                'w-full text-left rounded-lg px-3 py-2 flex items-center gap-2 transition-colors',
-                selectedId === p.id ? 'bg-brand-100' : 'hover:bg-white',
-              )}
-            >
-              <span
-                className={cn(
-                  'h-2 w-2 rounded-full',
-                  p.enabled ? 'bg-emerald-500' : 'bg-slate-300',
-                )}
-              />
-              <span className="text-sm flex-1 truncate">{p.name}</span>
-              <span className="text-[10px] text-slate-400">{p.protocol}</span>
-            </button>
-          ))}
-        </aside>
-
-        {/* Detail */}
+      <main className="mx-auto max-w-[1024px] grid grid-cols-[260px_1fr] gap-6 px-8 py-5">
+        <Sidebar
+          providers={providers}
+          selectedId={selectedId}
+          onSelect={setSelectedId}
+          onAdd={() => setShowAdd(true)}
+        />
         <section>
           {selected ? (
             <ProviderForm
@@ -147,20 +100,170 @@ export function OptionsApp() {
   );
 }
 
-function EmptyState({ onAdd }: { onAdd: () => void }) {
+// ─────────────────────────────────────────────────────────────────────────────
+// Banner — shown only when at least one provider is fully usable.
+
+function ReadyBanner({ providers }: { providers: StoredProvider[] }) {
+  const [dismissed, setDismissed] = useState(false);
+  const ready = providers.filter(
+    (p) => p.enabled && p.apiKey && p.models.length > 0,
+  );
+  if (ready.length === 0 || dismissed) return null;
+  const canClose = typeof window !== 'undefined' && !!window.close;
+
   return (
-    <div className="ld-card p-12 text-center">
-      <Sparkles size={32} className="mx-auto text-brand-400 mb-3" />
-      <h3 className="font-semibold mb-1">尚未配置 AI 模型</h3>
-      <p className="text-sm text-slate-500 mb-4">
-        添加任意支持的 Provider 即可开始使用。
-      </p>
-      <button onClick={onAdd} className="ld-btn-primary">
-        <Plus size={14} /> 添加 Provider
-      </button>
+    <div className="border-b border-accent-rule bg-accent-soft">
+      <div className="mx-auto max-w-[1024px] flex items-center gap-3 px-8 py-3">
+        <span
+          className="inline-block h-2 w-2 rounded-full"
+          style={{ background: 'oklch(0.52 0.10 155)' }}
+        />
+        <div className="flex-1 text-[13px]">
+          <span className="font-medium">已就绪</span>
+          <span className="text-ink-mute ml-2 latin italic">
+            ·{' '}
+            {ready.map((p) => `${p.name} · ${p.models[0]}`).join('， ')} ·
+            select any text on any page to translate
+          </span>
+        </div>
+        {canClose && (
+          <Button variant="ghost" size="sm" onClick={() => window.close()}>
+            关闭设置页
+          </Button>
+        )}
+        <button
+          type="button"
+          onClick={() => setDismissed(true)}
+          aria-label="收起"
+          className="h-6 w-6 inline-flex items-center justify-center text-ink-mute hover:text-ink"
+        >
+          ×
+        </button>
+      </div>
     </div>
   );
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Sidebar
+
+function Sidebar({
+  providers,
+  selectedId,
+  onSelect,
+  onAdd,
+}: {
+  providers: StoredProvider[];
+  selectedId: string | null;
+  onSelect: (id: string) => void;
+  onAdd: () => void;
+}) {
+  return (
+    <aside>
+      <div className="flex items-center justify-between mb-3">
+        <div className="ld-cap">A I 模 型</div>
+        <button
+          type="button"
+          onClick={onAdd}
+          aria-label="添加 Provider"
+          className="h-[22px] w-[22px] inline-flex items-center justify-center rounded-xs border border-ink-rule text-ink hover:bg-surface-alt"
+        >
+          +
+        </button>
+      </div>
+
+      {providers.length === 0 ? (
+        <div className="ld-card p-4 text-[12px] text-ink-mute leading-[1.6]">
+          还没有任何 Provider。
+          <button
+            type="button"
+            onClick={onAdd}
+            className="block mt-2 text-accent hover:opacity-80"
+          >
+            + 添加第一个
+          </button>
+        </div>
+      ) : (
+        <ul className="ld-card overflow-hidden">
+          {providers.map((p, i) => {
+            const usable = p.enabled && p.apiKey && p.models.length > 0;
+            const isSelected = p.id === selectedId;
+            return (
+              <li
+                key={p.id}
+                className={cn(
+                  i > 0 && 'border-t border-ink-hair',
+                )}
+              >
+                <button
+                  type="button"
+                  onClick={() => onSelect(p.id)}
+                  className={cn(
+                    'w-full text-left px-3.5 py-3 flex items-center gap-2.5 relative',
+                    isSelected ? 'bg-surface-alt' : 'hover:bg-surface-alt/60',
+                  )}
+                >
+                  {isSelected && (
+                    <span className="absolute left-0 top-1/2 -translate-y-1/2 h-6 w-0.5 bg-ink" />
+                  )}
+                  <span
+                    className="inline-block h-[7px] w-[7px] rounded-full shrink-0"
+                    style={{
+                      background: usable
+                        ? 'oklch(0.52 0.10 155)'
+                        : 'rgb(22 22 22 / 0.32)',
+                    }}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div
+                      className={cn(
+                        'text-[13px] truncate',
+                        isSelected ? 'font-medium' : '',
+                      )}
+                    >
+                      {p.name}
+                    </div>
+                    {p.models[0] && (
+                      <div className="latin italic text-[10.5px] text-ink-mute truncate">
+                        {p.protocol} · {p.models[0]}
+                      </div>
+                    )}
+                  </div>
+                  {isSelected && (
+                    <span className="text-[10px] tracking-cap-tight text-ink-mute shrink-0">
+                      默 认
+                    </span>
+                  )}
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </aside>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Empty state
+
+function EmptyState({ onAdd }: { onAdd: () => void }) {
+  return (
+    <div className="ld-card p-16 text-center">
+      <div className="ld-cap mb-4">尚 未 配 置</div>
+      <div className="text-[18px] font-medium mb-2">添加一个 AI Provider 开始</div>
+      <p className="latin italic text-[12px] text-ink-mute mb-5">
+        Bring your own key — direct browser-to-provider, no relay.
+      </p>
+      <Button variant="primary" size="md" onClick={onAdd}>
+        + 添加 Provider
+      </Button>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Provider form
 
 function ProviderForm({
   provider,
@@ -184,6 +287,8 @@ function ProviderForm({
     onChange(next);
   };
 
+  const usable = draft.enabled && draft.apiKey && draft.models.length > 0;
+
   const testConnection = async () => {
     if (!draft.apiKey.trim()) {
       setTesting('fail');
@@ -197,7 +302,7 @@ function ProviderForm({
     }
     if (!draft.models[0]) {
       setTesting('fail');
-      setTestMsg('请先添加至少一个模型名（在下方输入框输入后按回车）');
+      setTestMsg('请先添加至少一个模型名');
       return;
     }
     setTesting('running');
@@ -228,10 +333,8 @@ function ProviderForm({
         }
         setTesting('ok');
         setTestMsg(sample.trim() ? `模型回复："${sample.trim()}"` : '连接成功');
-        // First successful test auto-enables this provider — removes the most
-        // common onboarding trap where users forget the toggle.
         if (!draft.enabled) update({ enabled: true });
-      } else if (!resp.ok) {
+      } else {
         const text = await resp.text();
         const err = adapter.mapError(resp.status, text);
         setTesting('fail');
@@ -244,34 +347,47 @@ function ProviderForm({
   };
 
   return (
-    <div className="ld-card p-6 space-y-5">
-      <div className="flex items-start justify-between">
-        <div className="flex-1 mr-4">
-          <input
-            value={draft.name}
-            onChange={(e) => update({ name: e.target.value })}
-            className="text-lg font-semibold bg-transparent outline-none border-b border-transparent hover:border-slate-200 focus:border-brand-400 w-full"
-          />
+    <div className="ld-card p-8">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-4 mb-1.5">
+        <input
+          value={draft.name}
+          onChange={(e) => update({ name: e.target.value })}
+          className="text-[22px] font-medium bg-transparent outline-none border-b border-transparent focus:border-accent flex-1 min-w-0"
+        />
+        <div className="flex items-center gap-2 shrink-0">
+          {usable && (
+            <Pill tone="ok" size={10.5}>
+              <span
+                className="inline-block h-1.5 w-1.5 rounded-full"
+                style={{ background: 'oklch(0.52 0.10 155)' }}
+              />
+              已 连 接
+            </Pill>
+          )}
+          <label className="flex items-center gap-2 text-[12px] text-ink-soft">
+            <span>启 用</span>
+            <Switch
+              checked={draft.enabled}
+              onChange={(v) => update({ enabled: v })}
+            />
+          </label>
         </div>
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={draft.enabled}
-            onChange={(e) => update({ enabled: e.target.checked })}
-            className="h-4 w-4 accent-brand-500"
-          />
-          <span className="text-sm">启用</span>
-        </label>
+      </div>
+      <div className="latin italic text-[12px] text-ink-mute mb-8">
+        {protocolLabel(draft.protocol)} protocol
       </div>
 
-      <div className="grid grid-cols-[160px_1fr] gap-3">
+      {/* 连 接 */}
+      <SectionHeader caption="连 接" />
+      <div className="grid grid-cols-[180px_1fr] gap-4 mb-4">
         <Field label="协议">
           <select
             value={draft.protocol}
             onChange={(e) =>
               update({ protocol: e.target.value as StoredProvider['protocol'] })
             }
-            className="ld-input"
+            className="h-[36px] w-full px-3 rounded-sm border border-ink-rule bg-surface text-[13px] text-ink outline-none focus:border-accent focus:ring-[3px] focus:ring-accent/15"
           >
             <option value="openai">OpenAI 兼容</option>
             <option value="anthropic">Anthropic</option>
@@ -279,99 +395,130 @@ function ProviderForm({
           </select>
         </Field>
         <Field label="Base URL">
-          <input
+          <Input
+            mono
             value={draft.baseUrl}
             onChange={(e) => update({ baseUrl: e.target.value })}
             placeholder="https://api.example.com/v1"
-            className="ld-input font-mono text-xs"
           />
         </Field>
       </div>
 
       {draft.protocol === 'anthropic' && (
-        <Field label="鉴权方式">
+        <Field
+          label="鉴权方式"
+          hint="走公司内网网关时通常选 Bearer；直连 api.anthropic.com 选 x-api-key。"
+          className="mb-4"
+        >
           <select
             value={draft.authStyle ?? 'native'}
             onChange={(e) =>
               update({ authStyle: e.target.value as StoredProvider['authStyle'] })
             }
-            className="ld-input"
+            className="h-[36px] w-full px-3 rounded-sm border border-ink-rule bg-surface text-[13px] text-ink outline-none focus:border-accent focus:ring-[3px] focus:ring-accent/15"
           >
-            <option value="native">x-api-key (Anthropic 官方)</option>
-            <option value="bearer">Authorization: Bearer (网关 / 代理)</option>
+            <option value="native">x-api-key（Anthropic 官方）</option>
+            <option value="bearer">Authorization: Bearer（网关 / 代理）</option>
           </select>
-          <p className="text-[11px] text-slate-500 mt-1">
-            走公司内网网关时通常选 Bearer；直连 api.anthropic.com 选 x-api-key。
-          </p>
         </Field>
       )}
 
-      <Field label="API Key">
+      <Field
+        label="API Key"
+        hint="本地存储于浏览器，永不上传。"
+        className="mb-8"
+      >
         <div className="relative">
-          <input
+          <Input
+            mono
             type={showKey ? 'text' : 'password'}
             value={draft.apiKey}
             onChange={(e) => update({ apiKey: e.target.value })}
             placeholder="sk-..."
-            className="ld-input font-mono text-xs pr-10"
+            className="pr-20"
           />
           <button
             type="button"
             onClick={() => setShowKey((v) => !v)}
-            className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-            aria-label={showKey ? '隐藏' : '显示'}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-ink-mute hover:text-ink"
           >
-            {showKey ? <EyeOff size={14} /> : <Eye size={14} />}
+            {showKey ? '隐藏' : '显示'}
           </button>
         </div>
       </Field>
 
-      <Field label="已启用模型">
-        <ModelsEditor
-          models={draft.models}
-          onChange={(models) => update({ models })}
-        />
-      </Field>
+      {/* 模 型 */}
+      <SectionHeader caption="模 型" />
+      <ModelsEditor
+        models={draft.models}
+        onChange={(models) => update({ models })}
+      />
 
+      <div className="h-8" />
+
+      {/* 采 样 参 数 */}
+      <SectionHeader caption="采 样 参 数" />
       <AdvancedParams
         params={draft.params}
         onChange={(params) => update({ params })}
       />
 
-      <div className="flex items-center gap-2 pt-2 border-t border-black/[0.05]">
-        <button onClick={testConnection} className="ld-btn-primary">
-          {testing === 'running' ? '测试中...' : '🔌 测试连接'}
-        </button>
+      {/* Footer */}
+      <div className="mt-8 pt-5 border-t border-ink-hair flex items-center gap-3">
+        <Button
+          variant="primary"
+          loading={testing === 'running'}
+          onClick={testConnection}
+        >
+          🔌 测试连接
+        </Button>
         {testing === 'ok' && (
-          <span className="text-sm text-emerald-600 flex items-center gap-1">
-            <Check size={14} /> {testMsg}
+          <span className="text-[12px] text-ok flex items-center gap-1.5">
+            ✓ {testMsg}
           </span>
         )}
         {testing === 'fail' && (
-          <span className="text-sm text-red-500">{testMsg}</span>
+          <span className="text-[12px] text-err">{testMsg}</span>
         )}
         <div className="flex-1" />
-        <button
+        <Button
+          variant="danger"
+          size="md"
           onClick={() => {
             if (confirm(`删除 "${draft.name}"？`)) onDelete();
           }}
-          className="ld-btn-ghost text-red-500 hover:bg-red-50"
         >
-          <Trash2 size={14} /> 删除
-        </button>
+          删除此 Provider
+        </Button>
       </div>
     </div>
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function protocolLabel(p: StoredProvider['protocol']): string {
+  return p === 'openai'
+    ? 'OpenAI-compatible'
+    : p === 'anthropic'
+    ? 'Anthropic'
+    : p === 'gemini'
+    ? 'Google Gemini'
+    : p;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Section header — letter-spaced caption with a hair-rule beneath.
+
+function SectionHeader({ caption }: { caption: string }) {
   return (
-    <label className="block">
-      <div className="text-xs font-medium text-slate-600 mb-1.5">{label}</div>
-      {children}
-    </label>
+    <div className="mb-3">
+      <div className="ld-cap mb-2">{caption}</div>
+      <Hair />
+    </div>
   );
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Models editor
 
 function ModelsEditor({
   models,
@@ -392,73 +539,68 @@ function ModelsEditor({
     setInput('');
   };
   return (
-    <div className="space-y-2">
-      <div className="flex flex-wrap gap-1.5">
-        {models.map((m) => (
-          <span
-            key={m}
-            className="inline-flex items-center gap-1 rounded-md bg-brand-100 px-2 py-1 text-xs font-mono"
-          >
-            {m}
-            <button
-              onClick={() => onChange(models.filter((x) => x !== m))}
-              className="text-brand-700 hover:text-red-500"
-              aria-label="移除"
+    <Field label="已启用模型" addon={`${models.length} 个`}>
+      <div className="space-y-3">
+        <div className="flex flex-wrap gap-2 min-h-[28px]">
+          {models.map((m, i) => (
+            <span
+              key={m}
+              className="inline-flex items-center gap-1.5 rounded-xs bg-surface-alt border border-ink-hair px-2.5 py-1 latin italic text-[12px]"
             >
-              ×
-            </button>
-          </span>
-        ))}
+              {i === 0 && (
+                <span
+                  className="inline-block h-1.5 w-1.5 rounded-full bg-accent"
+                  title="默认模型"
+                />
+              )}
+              {m}
+              <button
+                type="button"
+                onClick={() => onChange(models.filter((x) => x !== m))}
+                className="text-ink-mute hover:text-err"
+                aria-label="移除"
+              >
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
+        <div className="flex gap-2">
+          <Input
+            mono
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                commit();
+              }
+            }}
+            onBlur={commit}
+            placeholder="输入模型名，回车或失焦添加"
+          />
+          <Button
+            variant="secondary"
+            size="md"
+            onClick={commit}
+            disabled={!input.trim()}
+          >
+            + 添加
+          </Button>
+        </div>
+        {models.length === 0 && (
+          <p className="text-[11px] text-warn">
+            ⚠ 至少需要添加 1 个模型名才能测试连接并使用
+          </p>
+        )}
       </div>
-      <div className="flex gap-2">
-        <input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault();
-              commit();
-            }
-          }}
-          // Also commit on blur so users who tab/click away don't silently
-          // lose what they typed — the original "Enter only" behavior was a
-          // foot-gun that caused testConnection to fall through to a bogus
-          // model name.
-          onBlur={commit}
-          placeholder="输入模型名，回车或失焦添加"
-          className="ld-input font-mono text-xs flex-1"
-        />
-        <button
-          type="button"
-          onClick={commit}
-          disabled={!input.trim()}
-          className="ld-btn-primary !px-3"
-        >
-          <Plus size={14} /> 添加
-        </button>
-      </div>
-      {models.length === 0 && (
-        <p className="text-[11px] text-amber-600">
-          ⚠ 至少需要添加 1 个模型名才能测试连接并使用
-        </p>
-      )}
-    </div>
+    </Field>
   );
 }
 
-/**
- * Optional sampling-parameter overrides per provider. Collapsed by default
- * because most users don't need it. Empty inputs mean "don't send the field
- * at all" — important because some gateway-fronted models (e.g. Claude Opus
- * 4.7 via internal proxies) reject the `temperature` parameter outright.
- */
-/**
- * Optional sampling-parameter overrides per provider. Empty inputs mean
- * "don't send the field at all" — important because some gateway-fronted
- * models (e.g. Claude Opus 4.7 via internal proxies) reject the
- * `temperature` parameter outright. Visible by default so users can find it
- * without hunting through a collapsed section.
- */
+// ─────────────────────────────────────────────────────────────────────────────
+// Advanced sampling params
+
 function AdvancedParams({
   params,
   onChange,
@@ -467,8 +609,6 @@ function AdvancedParams({
   onChange: (p: ProviderParams | undefined) => void;
 }) {
   const current = params ?? {};
-
-  // Empty string ⇒ undefined ⇒ field omitted from the request body.
   const setNumber = (key: keyof ProviderParams, raw: string) => {
     const next: ProviderParams = { ...current };
     if (raw === '') {
@@ -477,111 +617,59 @@ function AdvancedParams({
       const n = Number(raw);
       if (Number.isFinite(n)) next[key] = n;
     }
-    const hasAny = Object.keys(next).length > 0;
-    onChange(hasAny ? next : undefined);
+    onChange(Object.keys(next).length > 0 ? next : undefined);
   };
 
   return (
-    <Field label="采样参数（可选 · 留空即不发送该字段）">
-      <div className="grid grid-cols-3 gap-3">
-        <div>
-          <label className="text-[11px] text-slate-500 mb-1 block">
-            Temperature
-          </label>
-          <input
+    <div className="space-y-3">
+      <p className="latin italic text-[11px] text-ink-mute leading-[1.6]">
+        Leave any field blank to omit it from requests — useful for models that
+        reject specific parameters (e.g. Claude Opus 4.7 via internal gateways
+        does not accept <span className="mono">temperature</span>).
+      </p>
+      <div className="grid grid-cols-3 gap-4">
+        <Field label="温度" hint="0–2，留空 = 模型默认">
+          <Input
+            mono
             type="number"
             step="0.1"
             min="0"
             max="2"
             value={current.temperature ?? ''}
             onChange={(e) => setNumber('temperature', e.target.value)}
-            placeholder="留空 = 模型默认"
-            className="ld-input"
+            placeholder="—"
           />
-        </div>
-        <div>
-          <label className="text-[11px] text-slate-500 mb-1 block">Top P</label>
-          <input
+        </Field>
+        <Field label="Top P" hint="0–1，留空 = 模型默认">
+          <Input
+            mono
             type="number"
             step="0.05"
             min="0"
             max="1"
             value={current.topP ?? ''}
             onChange={(e) => setNumber('topP', e.target.value)}
-            placeholder="留空 = 模型默认"
-            className="ld-input"
+            placeholder="—"
           />
-        </div>
-        <div>
-          <label className="text-[11px] text-slate-500 mb-1 block">
-            Max Tokens
-          </label>
-          <input
+        </Field>
+        <Field label="最大 tokens" hint="留空 = 模型默认">
+          <Input
+            mono
             type="number"
             step="64"
             min="1"
             value={current.maxTokens ?? ''}
             onChange={(e) => setNumber('maxTokens', e.target.value)}
-            placeholder="留空 = 模型默认"
-            className="ld-input"
+            placeholder="—"
           />
-        </div>
-      </div>
-      <p className="text-[11px] text-slate-500 mt-2 leading-relaxed">
-        💡 翻译追求稳定可填 <code className="bg-surface-subtle px-1 rounded">temperature=0</code> 或 <code className="bg-surface-subtle px-1 rounded">0.3</code>。
-        遇到模型/网关报错（如 Claude Opus 4.7 经网关不接受 temperature），
-        <b>清空对应字段</b>重试即可。
-      </p>
-    </Field>
-  );
-}
-
-/**
- * Shown when at least one provider is fully usable. Tells the user setup is
- * complete and gives them a one-click way out of the options tab. The banner
- * is dismissible — closing only hides for the current page load.
- */
-function ReadyBanner({ providers }: { providers: StoredProvider[] }) {
-  const [dismissed, setDismissed] = useState(false);
-  const ready = providers.filter((p) => p.enabled && p.apiKey && p.models[0]);
-  if (ready.length === 0 || dismissed) return null;
-
-  const canClose = typeof window !== 'undefined' && !!window.close;
-
-  return (
-    <div className="border-b border-emerald-200/60 bg-emerald-50/80">
-      <div className="max-w-5xl mx-auto px-6 py-3 flex items-center gap-3">
-        <CheckCircle2 size={18} className="text-emerald-600 shrink-0" />
-        <div className="flex-1 text-sm">
-          <span className="font-medium text-emerald-900">已就绪</span>
-          <span className="text-emerald-700/80 ml-1.5">
-            · {ready.length} 个 Provider 可用（{ready
-              .map((p) => `${p.name} · ${p.models[0]}`)
-              .join('， ')}）
-          </span>
-          <span className="text-emerald-700/60 ml-1.5">
-            设置已自动保存，到任意网页选中文本即可翻译。
-          </span>
-        </div>
-        {canClose && (
-          <button
-            onClick={() => window.close()}
-            className="ld-btn-primary !py-1 !px-3 text-xs"
-          >
-            关闭设置页
-          </button>
-        )}
-        <button
-          onClick={() => setDismissed(true)}
-          className="ld-btn-ghost h-7 w-7 p-0 rounded-full text-emerald-700"
-          aria-label="收起"
-        >
-          <X size={14} />
-        </button>
+        </Field>
       </div>
     </div>
   );
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Add Provider modal
 
 function AddProviderModal({
   onClose,
@@ -590,45 +678,78 @@ function AddProviderModal({
   onClose: () => void;
   onAdd: (preset: (typeof PROVIDER_PRESETS)[number]) => void;
 }) {
+  const [query, setQuery] = useState('');
+  const filtered = PROVIDER_PRESETS.filter((p) =>
+    p.name.toLowerCase().includes(query.toLowerCase()),
+  );
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/30 backdrop-blur-sm flex items-center justify-center p-6"
+      className="fixed inset-0 z-50 flex items-center justify-center p-6"
+      style={{
+        background: 'rgba(22,22,22,0.32)',
+        backdropFilter: 'blur(6px)',
+      }}
       onClick={onClose}
     >
       <div
-        className="ld-card max-w-2xl w-full max-h-[80vh] overflow-auto ld-scrollbar"
+        className="w-full max-w-[640px] max-h-[80vh] flex flex-col bg-paper border border-ink-rule rounded-lg shadow-modal"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="p-5 border-b border-black/[0.05] sticky top-0 bg-white">
-          <h2 className="font-semibold">选择 AI Provider</h2>
-          <p className="text-xs text-slate-500 mt-0.5">
-            从内置模板开始，添加后还能修改 URL / 模型
-          </p>
+        <div className="px-6 py-5 border-b border-ink-hair flex items-start justify-between">
+          <div>
+            <div className="text-[16px] font-medium">添加 AI Provider</div>
+            <div className="latin italic text-[12px] text-ink-mute mt-1">
+              Start from a template, or configure manually.
+            </div>
+          </div>
+          <IconBtn aria-label="关闭" onClick={onClose}>
+            ×
+          </IconBtn>
         </div>
-        <div className="grid grid-cols-2 gap-2 p-4">
-          {PROVIDER_PRESETS.map((p) => (
+        <div className="px-6 py-3 border-b border-ink-hair">
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="搜索 Provider"
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-2.5 p-4 overflow-auto ld-scrollbar">
+          {filtered.map((p) => (
             <button
               key={p.key}
+              type="button"
               onClick={() => onAdd(p)}
-              className="text-left rounded-lg border border-slate-200 hover:border-brand-400 hover:bg-brand-50/50 p-3 transition-colors"
+              className="text-left rounded-sm border border-ink-hair bg-surface p-3.5 hover:border-accent hover:bg-accent-soft transition-colors"
             >
-              <div className="flex items-center justify-between">
-                <div className="font-medium text-sm">{p.name}</div>
-                <span className="text-[10px] text-slate-400">{p.protocol}</span>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="inline-flex h-8 w-8 items-center justify-center rounded-sm bg-surface-alt text-[14px] font-medium">
+                  {p.name.slice(0, 1)}
+                </span>
+                <div className="flex-1">
+                  <div className="text-[13.5px] font-medium">{p.name}</div>
+                  <div className="latin italic text-[11px] text-ink-mute">
+                    {p.protocol}
+                  </div>
+                </div>
+                {p.freeTier && (
+                  <Pill tone="ok" size={9.5}>
+                    免费
+                  </Pill>
+                )}
               </div>
-              {p.freeTier && (
-                <div className="text-[11px] text-emerald-600 mt-1">{p.freeTier}</div>
-              )}
               {p.signupUrl && (
-                <a
-                  href={p.signupUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  onClick={(e) => e.stopPropagation()}
-                  className="text-[11px] text-brand-500 hover:underline mt-1 inline-flex items-center gap-0.5"
-                >
-                  申请 Key <ExternalLink size={9} />
-                </a>
+                <div className="text-[10.5px] text-ink-mute mt-1.5 flex items-center justify-between">
+                  <a
+                    href={p.signupUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="hover:text-ink"
+                  >
+                    申请 Key ↗
+                  </a>
+                  <span className="text-accent">选择 →</span>
+                </div>
               )}
             </button>
           ))}

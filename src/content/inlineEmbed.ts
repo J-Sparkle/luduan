@@ -4,28 +4,28 @@ import type { TranslateTask } from '@/shared/prompts';
 export type EmbedPlacement = 'below' | 'beside';
 
 export interface EmbedOptions {
-  container: Element;     // host page element to attach next to
+  container: Element;
   task: TranslateTask;
   placement?: EmbedPlacement;
-  /** Optional explicit provider+model override (same semantics as
-   *  ChatPortRequest). If omitted, the background falls back to the
-   *  first enabled provider's first model. */
   providerId?: string;
   modelName?: string;
 }
 
 const INLINE_CLASS = 'luduan-inline-translation';
-const BRAND = '#7C5CFF';
+const INK = '#161616';
+const INK_HAIR = 'rgba(22,22,22,0.10)';
+const INK_MUTE = 'rgba(22,22,22,0.52)';
+const ACCENT = 'oklch(0.42 0.09 252)';
 
 /**
- * Renders the translation directly into the host page (NOT in our Shadow
- * DOM), as a sibling to the selection's block container. This integrates
- * visually with the page text the way Immersive Translate's bilingual mode
- * does, instead of floating as an overlay.
+ * Bookish inline embed — instead of a colored left-border box around the
+ * translation, we use **classical book typography**: hair-rules above and
+ * below the translation, with a small marginalia tag ("中 译") in the gutter.
  *
- * The inserted node uses `all: initial` + inline styles to defend against
- * stray page CSS, and carries a brand-colored left bar so it's recognisable
- * but doesn't overwhelm.
+ * Streams text into the embed via a long-lived background port. The wrapper
+ * is rendered into the host page DOM (not Shadow DOM) so it integrates
+ * visually with the surrounding paragraph's typography, but its inner
+ * styles are all explicit so page CSS can't drift the layout.
  */
 export function embedTranslationInline(opts: EmbedOptions): {
   element: HTMLElement;
@@ -39,30 +39,62 @@ export function embedTranslationInline(opts: EmbedOptions): {
   wrapper.dataset.luduanPlacement = placement;
   applyWrapperStyles(wrapper, placement);
 
-  // Text body (where streaming chunks go) + streaming cursor + close button.
+  // Marginalia tag: vertical "中 译" caption with hair-rule below.
+  const gutter = document.createElement('div');
+  Object.assign(gutter.style, {
+    position: 'absolute',
+    left: '0',
+    top: '12px',
+    width: '24px',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '6px',
+    color: INK_MUTE,
+    fontSize: '9px',
+    letterSpacing: '0.12em',
+    lineHeight: '1.4',
+    fontFamily: 'inherit',
+    pointerEvents: 'none',
+  });
+  gutter.innerHTML = `<span>中</span><span>译</span>`;
+  const gutterRule = document.createElement('div');
+  Object.assign(gutterRule.style, {
+    width: '1px',
+    height: '20px',
+    background: INK_HAIR,
+    marginTop: '4px',
+  });
+  gutter.appendChild(gutterRule);
+  wrapper.appendChild(gutter);
+
+  // Text body
   const body = document.createElement('div');
   Object.assign(body.style, {
     display: 'block',
     whiteSpace: 'pre-wrap',
-    paddingRight: '28px',
-    color: 'inherit',
+    color: INK,
+    fontSize: '14.5px',
+    lineHeight: '1.85',
+    padding: '0 32px 0 0',
   });
   wrapper.appendChild(body);
 
+  // Streaming cursor (anchored at end of body)
   const cursor = document.createElement('span');
-  cursor.textContent = '▍';
   Object.assign(cursor.style, {
     display: 'inline-block',
-    color: BRAND,
-    opacity: '0.5',
-    animation: 'luduan-blink 1.1s linear infinite',
+    width: '2px',
+    height: '1.05em',
+    background: ACCENT,
     marginLeft: '2px',
+    verticalAlign: '-2px',
+    animation: 'luduan-blink 1s infinite',
   });
   body.appendChild(cursor);
+  ensureKeyframes();
 
-  // One-time keyframes injection for the cursor pulse.
-  ensureBlinkKeyframes();
-
+  // Close button (top-right of wrapper, hairline ghost)
   const closeBtn = document.createElement('button');
   closeBtn.type = 'button';
   closeBtn.textContent = '×';
@@ -70,32 +102,32 @@ export function embedTranslationInline(opts: EmbedOptions): {
   closeBtn.setAttribute('aria-label', '关闭翻译');
   Object.assign(closeBtn.style, {
     position: 'absolute',
-    top: '4px',
-    right: '6px',
+    top: '6px',
+    right: '0',
+    width: '20px',
+    height: '20px',
     cursor: 'pointer',
-    color: BRAND,
+    color: INK_MUTE,
     background: 'transparent',
     border: 'none',
-    padding: '2px 8px',
-    fontSize: '16px',
+    padding: '0',
+    fontSize: '14px',
     lineHeight: '1',
     fontFamily: 'inherit',
-    borderRadius: '4px',
+    borderRadius: '2px',
   });
-  closeBtn.onmouseenter = () => (closeBtn.style.background = 'rgba(124,92,255,0.1)');
-  closeBtn.onmouseleave = () => (closeBtn.style.background = 'transparent');
+  closeBtn.onmouseenter = () => (closeBtn.style.color = INK);
+  closeBtn.onmouseleave = () => (closeBtn.style.color = INK_MUTE);
   wrapper.appendChild(closeBtn);
 
   // Insert into page DOM.
   if (placement === 'below') {
     opts.container.parentNode?.insertBefore(wrapper, opts.container.nextSibling);
   } else {
-    // 'beside': try to put it on the right of the container in a flex row;
-    // fall back to 'below' if the container has no parent we can wrap.
     insertBeside(opts.container, wrapper);
   }
 
-  // Stream into it via a fresh background port.
+  // Stream into it.
   const port = chrome.runtime.connect({ name: MSG.PORT_CHAT });
   let accum = '';
 
@@ -115,28 +147,21 @@ export function embedTranslationInline(opts: EmbedOptions): {
   port.onMessage.addListener((msg: ChatPortMessage) => {
     if (msg.type === 'text') {
       accum += msg.delta;
-      // Re-render body: text first, then cursor at the end.
       while (body.firstChild) body.removeChild(body.firstChild);
       body.appendChild(document.createTextNode(accum));
       body.appendChild(cursor);
     } else if (msg.type === 'error') {
       cursor.remove();
       while (body.firstChild) body.removeChild(body.firstChild);
-      body.appendChild(
-        document.createTextNode(`翻译失败：${msg.message}`),
-      );
-      wrapper.style.borderLeftColor = '#dc2626';
-      body.style.color = '#dc2626';
+      body.appendChild(document.createTextNode(`翻译失败：${msg.message}`));
+      body.style.color = 'oklch(0.55 0.16 28)';
       cleanup();
     } else if (msg.type === 'done') {
       cursor.remove();
       cleanup();
     }
   });
-
-  port.onDisconnect.addListener(() => {
-    cursor.remove();
-  });
+  port.onDisconnect.addListener(() => cursor.remove());
 
   const req: ChatPortRequest = {
     type: 'translate',
@@ -150,34 +175,27 @@ export function embedTranslationInline(opts: EmbedOptions): {
 }
 
 function applyWrapperStyles(el: HTMLElement, placement: EmbedPlacement): void {
-  // Reset inherited weirdness, then apply our own.
   el.style.cssText = '';
   Object.assign(el.style, {
     boxSizing: 'border-box',
     display: 'block',
-    margin: placement === 'below' ? '8px 0' : '0',
-    padding: '8px 12px',
-    border: '1px solid rgba(124, 92, 255, 0.25)',
-    borderLeft: `3px solid ${BRAND}`,
-    borderRadius: '6px',
-    background: 'rgba(124, 92, 255, 0.05)',
-    fontSize: '14px',
-    lineHeight: '1.6',
-    color: '#1A1D2B',
-    fontFamily:
-      '-apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif',
+    margin: placement === 'below' ? '12px 0' : '0',
+    padding: '10px 0 12px',
+    borderTop: `1px solid ${INK_HAIR}`,
+    borderBottom: `1px solid ${INK_HAIR}`,
+    paddingLeft: '36px',
     position: 'relative',
+    fontFamily:
+      '"Noto Serif SC", "Songti SC", "STSong", "Source Han Serif SC", Georgia, serif',
+    color: INK,
     textAlign: 'left',
     width: '100%',
   } as Partial<CSSStyleDeclaration>);
 }
 
 function insertBeside(container: Element, wrapper: HTMLElement): void {
-  // Wrap [container, wrapper] in a flex row so they sit side by side
-  // without needing to mutate the container's own styles permanently.
   const parent = container.parentNode;
   if (!parent) return;
-  // Look for an existing luduan flex wrapper from a prior translation.
   const existingRow = container.parentElement?.classList.contains(
     'luduan-flex-row',
   )
@@ -190,40 +208,42 @@ function insertBeside(container: Element, wrapper: HTMLElement): void {
   const row = document.createElement('div');
   row.className = 'luduan-flex-row';
   Object.assign(row.style, {
-    display: 'flex',
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
     alignItems: 'flex-start',
-    gap: '12px',
+    gap: '0',
     width: '100%',
+    borderTop: `1px solid ${INK_HAIR}`,
+    borderBottom: `1px solid ${INK_HAIR}`,
   } as Partial<CSSStyleDeclaration>);
   parent.insertBefore(row, container);
-  // Move container into the row, keep relative widths balanced.
-  (container as HTMLElement).style.flex = '1 1 0';
-  wrapper.style.flex = '1 1 0';
+  (container as HTMLElement).style.padding = '10px 18px 12px 0';
+  (container as HTMLElement).style.borderRight = `1px solid ${INK_HAIR}`;
   wrapper.style.margin = '0';
+  wrapper.style.borderTop = 'none';
+  wrapper.style.borderBottom = 'none';
+  wrapper.style.padding = '10px 0 12px 18px';
+  wrapper.style.paddingLeft = '54px';
   row.appendChild(container);
   row.appendChild(wrapper);
 }
 
-function ensureBlinkKeyframes(): void {
+function ensureKeyframes(): void {
   if (document.getElementById('luduan-blink-style')) return;
   const style = document.createElement('style');
   style.id = 'luduan-blink-style';
   style.textContent =
-    '@keyframes luduan-blink { 0%, 100% { opacity: 0.5 } 50% { opacity: 0 } }';
+    '@keyframes luduan-blink { 0%, 49% { opacity: 1 } 50%, 100% { opacity: 0 } }';
   document.head.appendChild(style);
 }
 
-/** Remove all inline translations on the current page. */
 export function removeAllInlineTranslations(): number {
   const list = document.querySelectorAll(`.${INLINE_CLASS}`);
   list.forEach((el) => el.remove());
-  // Unwrap any luduan-flex-row containers we created.
   document.querySelectorAll('.luduan-flex-row').forEach((row) => {
     const parent = row.parentNode;
     if (!parent) return;
-    while (row.firstChild) {
-      parent.insertBefore(row.firstChild, row);
-    }
+    while (row.firstChild) parent.insertBefore(row.firstChild, row);
     row.remove();
   });
   return list.length;

@@ -2,11 +2,15 @@ import { useEffect, useState } from 'react';
 import { useSelection, type SelectionAnchor } from './useSelection';
 import { Bubble } from './Bubble';
 import { Card } from './Card';
+import { Fab } from './Fab';
 
 /**
- * Top-level content-script app. Manages two visual layers:
- *   - bubble  : a tiny floating button on the latest selection
- *   - card    : the actual translation panel; opens on bubble click
+ * Top-level content-script app. Three visual layers:
+ *   - fab     : persistent floating ball on the page edge for page-level
+ *               actions (translate全文 / 翻译段落). Always visible unless
+ *               the user dismisses it for the tab.
+ *   - bubble  : small button next to a fresh text selection
+ *   - card    : full translation panel opened by clicking the bubble
  */
 export function ContentApp() {
   const { anchor, clear } = useSelection();
@@ -35,6 +39,7 @@ export function ContentApp() {
 
   return (
     <>
+      <Fab />
       {anchor && !card && (
         <Bubble
           anchor={anchor}

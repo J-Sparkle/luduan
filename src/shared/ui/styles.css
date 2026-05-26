@@ -2,50 +2,79 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+  Bookish, minimal, international.
+  All-serif typography, warm paper background, near-black ink, single muted
+  indigo accent. Hair-rules over heavy borders. No emoji, no gradients, no
+  glassmorphism.
+
+  Fonts are NOT remote-fetched (Manifest V3 CSP friendly). System fallbacks
+  produce the intended look on macOS (Songti SC + Georgia). Other platforms
+  fall back to the platform's serif.
+*/
+
 @layer base {
   :root {
-    color-scheme: light dark;
+    color-scheme: light;
   }
 
+  html,
   body {
-    font-family: theme('fontFamily.sans');
+    font-family: theme('fontFamily.serif');
+    background: theme('colors.paper');
+    color: theme('colors.ink.DEFAULT');
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    /* Tighter Chinese kerning. */
+    font-feature-settings: 'palt';
+  }
+
+  /* Italic Latin asides — apply via .latin class. */
+  .latin {
+    font-family: theme('fontFamily.latin');
+  }
+
+  .mono {
+    font-family: theme('fontFamily.mono');
   }
 }
 
 @layer components {
+  /* Letter-spaced caption ("使 用 方 式"). Each character renders with the
+   * tracking that creates the "spaced-out" effect. */
+  .ld-cap {
+    @apply text-[11px] text-ink-mute tracking-cap-wide uppercase;
+  }
+  .ld-cap-tight {
+    @apply text-[11px] text-ink-mute tracking-cap-tight;
+  }
+
+  /* Hair-rule (1px line). */
+  .ld-hair {
+    @apply h-px bg-ink-hair;
+  }
+
+  /* Section divider with optional ornament — use <div className="ld-rule" /> */
+  .ld-rule {
+    @apply border-t border-ink-hair;
+  }
+
+  /* Generic paper card. */
   .ld-card {
-    @apply rounded-2xl bg-surface shadow-card border border-black/[0.04];
-  }
-
-  .ld-btn {
-    @apply inline-flex items-center justify-center gap-1.5 rounded-[10px] px-3 py-1.5
-           text-sm font-medium transition-colors;
-  }
-
-  .ld-btn-primary {
-    @apply ld-btn bg-gradient-to-r from-brand-500 to-accent text-white
-           hover:brightness-105 active:brightness-95;
-  }
-
-  .ld-btn-ghost {
-    @apply ld-btn text-slate-600 hover:bg-surface-subtle dark:text-slate-300 dark:hover:bg-white/5;
-  }
-
-  .ld-input {
-    @apply w-full rounded-[10px] border border-slate-200 bg-white px-3 py-2 text-sm
-           outline-none placeholder:text-slate-400
-           focus:border-brand-400 focus:ring-2 focus:ring-brand-400/20
-           dark:border-white/10 dark:bg-surface-dark-muted dark:text-slate-100;
+    @apply rounded-sm border border-ink-hair bg-surface shadow-card;
   }
 }
 
 @layer utilities {
-  .ld-scrollbar::-webkit-scrollbar { width: 8px; height: 8px; }
+  .ld-scrollbar::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
   .ld-scrollbar::-webkit-scrollbar-thumb {
-    background: rgba(0, 0, 0, 0.15);
+    background: rgb(22 22 22 / 0.15);
     border-radius: 999px;
   }
-  .ld-scrollbar::-webkit-scrollbar-track { background: transparent; }
+  .ld-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
 }

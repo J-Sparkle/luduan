@@ -1,4 +1,4 @@
-import { Languages } from 'lucide-react';
+import { Mark } from '@/shared/ui/Mark';
 import type { SelectionAnchor } from './useSelection';
 
 interface BubbleProps {
@@ -6,11 +6,15 @@ interface BubbleProps {
   onClick: () => void;
 }
 
-const BUBBLE_SIZE = 32;
+const BUBBLE_SIZE = 36;
 const OFFSET = 8;
 
+/**
+ * 36px circle bubble, white paper background, ink-rule border, hairline drop
+ * shadow. Hosts the vesica-piscis mark. Hover state darkens the border ring.
+ * Pop-in (250ms) on appear; CSS handles the scale and opacity transitions.
+ */
 export function Bubble({ anchor, onClick }: BubbleProps) {
-  // Position bubble to the upper-right of the selection, clamped to viewport.
   const top = Math.max(8, anchor.rect.top - BUBBLE_SIZE - OFFSET);
   const left = Math.min(
     window.innerWidth - BUBBLE_SIZE - 8,
@@ -20,19 +24,29 @@ export function Bubble({ anchor, onClick }: BubbleProps) {
   return (
     <button
       onMouseDown={(e) => {
-        // Prevent the click from clearing the page selection.
         e.preventDefault();
         e.stopPropagation();
         onClick();
       }}
-      style={{ position: 'fixed', top, left, width: BUBBLE_SIZE, height: BUBBLE_SIZE }}
-      className="animate-pop-in flex items-center justify-center rounded-full
-                 bg-gradient-to-br from-brand-500 to-accent text-white shadow-bubble
-                 hover:scale-105 active:scale-95 transition-transform"
+      style={{
+        position: 'fixed',
+        top,
+        left,
+        width: BUBBLE_SIZE,
+        height: BUBBLE_SIZE,
+      }}
+      className="
+        inline-flex items-center justify-center rounded-full bg-surface
+        border border-ink-rule shadow-bubble
+        animate-pop-in
+        transition-all duration-200
+        hover:border-ink hover:shadow-bubble-hover hover:scale-[1.06]
+        active:scale-[0.94]
+      "
       aria-label="翻译选中文本"
       title="翻译 (Alt+T)"
     >
-      <Languages size={16} strokeWidth={2.25} />
+      <Mark size={20} color="#161616" accent="oklch(0.42 0.09 252)" />
     </button>
   );
 }
