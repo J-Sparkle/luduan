@@ -1,11 +1,23 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none">
+  <!--
+    Bookish-minimal Luduan extension icon.
+    Paper-tone rounded square + vesica-piscis mark (two overlapping circles,
+    intersection filled vermillion). Matches the on-page brand mark
+    geometry from src/shared/ui/Mark.tsx (r/cx/stroke scaled to taste so the
+    glyph reads at 16px in the Chrome toolbar).
+  -->
+  <rect width="128" height="128" rx="22" fill="#FAFAF6" stroke="#1616161A" stroke-width="1"/>
+
   <defs>
-    <linearGradient id="g" x1="0" y1="0" x2="128" y2="128" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#7C5CFF"/>
-      <stop offset="100%" stop-color="#5B8DEF"/>
-    </linearGradient>
+    <clipPath id="leftClip">
+      <circle cx="54" cy="64" r="26"/>
+    </clipPath>
   </defs>
-  <rect width="128" height="128" rx="28" fill="url(#g)"/>
-  <text x="64" y="86" font-size="68" font-family="-apple-system, PingFang SC, sans-serif" font-weight="700"
-        text-anchor="middle" fill="#FFFFFF">甪</text>
+
+  <!-- Two overlapping ink circles -->
+  <circle cx="54" cy="64" r="26" fill="none" stroke="#161616" stroke-width="4.6"/>
+  <circle cx="74" cy="64" r="26" fill="none" stroke="#161616" stroke-width="4.6"/>
+
+  <!-- Vermillion seal — fill the intersection (right circle clipped to left) -->
+  <circle cx="74" cy="64" r="26" fill="#B85540" clip-path="url(#leftClip)" opacity="0.94"/>
 </svg>
